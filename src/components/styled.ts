@@ -63,7 +63,8 @@ export function styled<
 >(tag: T, styleParam: StyleParam<P>): FC<StyledProps<T, P>> {
   const StyledComponent: FC<StyledProps<T, P>> = (props) => {
     const { theme } = useTheme(); // <==== Pull theme from context
-    const className = useMemo(() => generateClassName(), [theme]);
+    const classNameRef = useRef<string>(generateClassName());
+    const className = classNameRef.current;
 
     // Turn styleParam into a function if it's not already.
     const getStyleFn = useMemo(() => {
@@ -90,13 +91,21 @@ export function styled<
 
     // Inject or update the <style> in the DOM.
     useEffect(() => {
-      const styleTag = document.createElement("style");
+      const styleId = `style-${className}`;
+      let styleTag = document.getElementById(
+        styleId
+      ) as HTMLStyleElement | null;
+
+      if (!styleTag) {
+        styleTag = document.createElement("style");
+        styleTag.id = styleId;
+        document.head.appendChild(styleTag);
+      }
+
       styleTag.textContent = finalCss;
-      document.head.appendChild(styleTag);
-      return () => {
-        document.head.removeChild(styleTag);
-      };
-    }, [finalCss]);
+
+      // No cleanup needed since we're updating existing style tag
+    }, [finalCss, className]);
 
     // Spread the rest props, apply the generated className
     const { children, ...restProps } = props;

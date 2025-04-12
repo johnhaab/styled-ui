@@ -1,6 +1,6 @@
 {
   "name": "@johnhaab/my-ui-library",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "main": "main/index.js",
   "types": "main/index.d.ts",
   "private": false,
