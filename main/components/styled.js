@@ -59,14 +59,14 @@ function styleObjectToCss(className, styleObj) {
     for (const key of Object.keys(styleObj)) {
         const val = styleObj[key];
         if (key.startsWith(":") || key.startsWith("&")) {
-            // Pseudo-class or nested selector
-            const pseudoSelector = key.replace("&", `.${className}`);
+            const pseudoSelector = key.startsWith("&")
+                ? key.replace("&", `.${className}`)
+                : `.${className}${key}`;
             if (typeof val === "object") {
                 nestedStyles += `${pseudoSelector} {${styleObjectToDeclarations(val)}}`;
             }
         }
         else {
-            // Regular CSS property
             baseStyles += `${camelCaseToDash(key)}: ${val};`;
         }
     }
