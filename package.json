@@ -1,0 +1,21 @@
+{
+  "name": "@johnhaab/my-ui-library",
+  "version": "0.0.1",
+  "main": "main/index.js",
+  "types": "main/index.d.ts",
+  "private": false,
+  "files": [
+    "main"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.1",
+    "typescript": "^5.0.0"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
+  }
+}
