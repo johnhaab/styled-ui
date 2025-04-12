@@ -24,7 +24,7 @@ export const lightTheme: ThemeType = {
   background2: "#EDE3DA", // Warm beige
   background3: "#E5DBD0", // Muted sand
   background4: "#DDD3C8", // Subtle warm gray
-  midground: "#F8F4EF", // Very soft warm white
+  midground: "#bfbfbf", // Very soft warm white
   midground1: "#F4EEE8", // Light muted creamy white
   midground2: "#F0E9E4", // Soft neutral off-white
   midground3: "#EBE4DE", // Warmer pale sand
