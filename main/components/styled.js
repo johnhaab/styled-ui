@@ -9,12 +9,13 @@ var __rest = (this && this.__rest) || function (s, e) {
         }
     return t;
 };
-import React, { useEffect, useMemo, } from "react";
+import React, { useEffect, useMemo, useRef, } from "react";
 import { useTheme } from "../theme/theme-provider";
 export function styled(tag, styleParam) {
     const StyledComponent = (props) => {
         const { theme } = useTheme(); // <==== Pull theme from context
-        const className = useMemo(() => generateClassName(), [theme]);
+        const classNameRef = useRef(generateClassName());
+        const className = classNameRef.current;
         // Turn styleParam into a function if it's not already.
         const getStyleFn = useMemo(() => {
             if (typeof styleParam === "function") {
@@ -36,13 +37,16 @@ export function styled(tag, styleParam) {
         }, [styleObj]);
         // Inject or update the <style> in the DOM.
         useEffect(() => {
-            const styleTag = document.createElement("style");
+            const styleId = `style-${className}`;
+            let styleTag = document.getElementById(styleId);
+            if (!styleTag) {
+                styleTag = document.createElement("style");
+                styleTag.id = styleId;
+                document.head.appendChild(styleTag);
+            }
             styleTag.textContent = finalCss;
-            document.head.appendChild(styleTag);
-            return () => {
-                document.head.removeChild(styleTag);
-            };
-        }, [finalCss]);
+            // No cleanup needed since we're updating existing style tag
+        }, [finalCss, className]);
         // Spread the rest props, apply the generated className
         const { children } = props, restProps = __rest(props, ["children"]);
         return React.createElement(tag, Object.assign(Object.assign({}, restProps), { className: [className, restProps.className].filter(Boolean).join(" ") }), children);
