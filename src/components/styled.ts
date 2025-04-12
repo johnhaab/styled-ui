@@ -9,160 +9,99 @@ import React, {
 import { ThemeType } from "../theme/theme";
 import { useTheme } from "../theme/theme-provider";
 
-/**
- * Represents normal CSS or pseudo-selectors.
- * "key: value" can be:
- * - "color": "red"
- * - ":hover": { color: "blue" }
- * - "& > span": { margin: 10 }
- */
-export interface StyleObject {
+type StyleObject = {
   [key: string]: string | number | StyleObject;
-}
+};
 
-/**
- * A utility type that:
- * 1. Takes a JSX element tag like 'div', 'button', etc.
- * 2. Combines default props for that element with extra typed props `P`.
- */
 type StyledProps<T extends keyof JSX.IntrinsicElements, P> = Omit<
   ComponentPropsWithoutRef<T>,
   keyof P
 > &
   P & {
-    // IMPORTANT: Use your actual theme type here so TypeScript can do auto-completion.
     $theme?: ThemeType;
-    children?: React.ReactNode;
     className?: string;
+    children?: React.ReactNode;
   };
 
-// We allow either a plain object or a function that returns a style object.
 type StyleParam<P> =
   | StyleObject
   | ((props: { $theme: ThemeType } & P) => StyleObject);
 
-/**
- * Overload #1: style object (no custom props beyond $theme).
- */
-export function styled<T extends keyof JSX.IntrinsicElements>(
-  tag: T,
-  styleObj: StyleObject
-): FC<StyledProps<T, unknown>>;
+// Cache to avoid duplicate <style> tags
+const styleCache = new Map<string, string>();
 
-/**
- * Overload #2: style function with typed props.
- */
-export function styled<T extends keyof JSX.IntrinsicElements, P extends object>(
-  tag: T,
-  styleFn: (props: { $theme: ThemeType } & P) => StyleObject
-): FC<StyledProps<T, P>>;
+function styleToCss(className: string, styles: StyleObject): string {
+  let base = "";
+  let nested = "";
 
-export function styled<
-  T extends keyof JSX.IntrinsicElements,
-  P extends object = object
->(tag: T, styleParam: StyleParam<P>): FC<StyledProps<T, P>> {
-  const StyledComponent: FC<StyledProps<T, P>> = (props) => {
-    const { theme } = useTheme(); // <==== Pull theme from context
-    const classNameRef = useRef<string>(generateClassName());
-    const className = classNameRef.current;
+  for (const key in styles) {
+    const val = styles[key];
 
-    // Turn styleParam into a function if it's not already.
-    const getStyleFn = useMemo(() => {
-      if (typeof styleParam === "function") {
-        return styleParam;
-      } else {
-        // If it's a style object, return a no-arg function that always returns the object.
-        return () => styleParam;
-      }
-    }, [styleParam]);
-
-    // Recompute the style object when props change.
-    const styleObj = useMemo(() => {
-      const finalProps = { ...props, $theme: theme } as {
-        $theme: ThemeType;
-      } & P;
-      return getStyleFn(finalProps);
-    }, [props, theme, getStyleFn]);
-
-    // Build final CSS from the style object + class name.
-    const finalCss = useMemo(() => {
-      return styleObjectToCss(className, styleObj);
-    }, [styleObj]);
-
-    // Inject or update the <style> in the DOM.
-    useEffect(() => {
-      const styleId = `style-${className}`;
-      let styleTag = document.getElementById(
-        styleId
-      ) as HTMLStyleElement | null;
-
-      if (!styleTag) {
-        styleTag = document.createElement("style");
-        styleTag.id = styleId;
-        document.head.appendChild(styleTag);
-      }
-
-      styleTag.textContent = finalCss;
-
-      // No cleanup needed since we're updating existing style tag
-    }, [finalCss, className]);
-
-    // Spread the rest props, apply the generated className
-    const { children, ...restProps } = props;
-    return React.createElement(
-      tag,
-      {
-        ...restProps,
-        className: [className, restProps.className].filter(Boolean).join(" "),
-      },
-      children
-    );
-  };
-
-  return StyledComponent;
-}
-
-function styleObjectToCss(className: string, styleObj: StyleObject): string {
-  let baseStyles = "";
-  let nestedStyles = "";
-
-  for (const key of Object.keys(styleObj)) {
-    const val = styleObj[key];
-    if (key.startsWith(":") || key.startsWith("&")) {
-      const pseudoSelector = key.startsWith("&")
+    if (typeof val === "object") {
+      const selector = key.startsWith("&")
         ? key.replace("&", `.${className}`)
         : `.${className}${key}`;
-
-      if (typeof val === "object") {
-        nestedStyles += `${pseudoSelector} {${styleObjectToDeclarations(
-          val as StyleObject
-        )}}`;
-      }
+      nested += `${selector} { ${styleToDeclarations(val)} }`;
     } else {
-      baseStyles += `${camelCaseToDash(key)}: ${val};`;
+      base += `${camelCaseToDash(key)}: ${val};`;
     }
   }
 
-  return `.${className} {${baseStyles}} ${nestedStyles}`;
+  return `.${className} { ${base} } ${nested}`;
 }
 
-function styleObjectToDeclarations(obj: StyleObject): string {
-  let declarations = "";
-  for (const key of Object.keys(obj)) {
-    const val = obj[key];
-    if (typeof val === "object") {
-      // If there are nested objects, handle them or skip
-      continue;
-    }
-    declarations += `${camelCaseToDash(key)}: ${val};`;
-  }
-  return declarations;
+function styleToDeclarations(obj: StyleObject): string {
+  return Object.entries(obj)
+    .filter(([, v]) => typeof v !== "object")
+    .map(([k, v]) => `${camelCaseToDash(k)}: ${v};`)
+    .join(" ");
 }
 
 function camelCaseToDash(str: string) {
   return str.replace(/[A-Z]/g, (m) => "-" + m.toLowerCase());
 }
 
-function generateClassName() {
-  return "sc-" + Math.random().toString(36).substr(2, 7);
+function generateClassHash(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return `sc-${Math.abs(hash).toString(36)}`;
+}
+
+export function styled<
+  T extends keyof JSX.IntrinsicElements,
+  P extends object = {}
+>(tag: T, styleParam: StyleParam<P>): FC<StyledProps<T, P>> {
+  return function StyledComponent(props: StyledProps<T, P>) {
+    const { theme: $theme } = useTheme();
+    const fullProps = { ...props, $theme } as { $theme: ThemeType } & P;
+
+    const styleObj =
+      typeof styleParam === "function" ? styleParam(fullProps) : styleParam;
+
+    const styleKey = JSON.stringify(styleObj);
+    const className = useMemo(() => generateClassHash(styleKey), [styleKey]);
+
+    useEffect(() => {
+      if (styleCache.has(className)) return;
+      const css = styleToCss(className, styleObj);
+      const tag = document.createElement("style");
+      tag.textContent = css;
+      document.head.appendChild(tag);
+      styleCache.set(className, css);
+    }, [className, styleKey]);
+
+    const { children, className: incomingClass, ...rest } = props;
+
+    return React.createElement(
+      tag,
+      {
+        ...rest,
+        className: [className, incomingClass].filter(Boolean).join(" "),
+      },
+      children
+    );
+  };
 }

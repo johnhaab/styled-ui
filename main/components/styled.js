@@ -9,84 +9,61 @@ var __rest = (this && this.__rest) || function (s, e) {
         }
     return t;
 };
-import React, { useEffect, useMemo, useRef, } from "react";
+import React, { useEffect, useMemo, } from "react";
 import { useTheme } from "../theme/theme-provider";
-export function styled(tag, styleParam) {
-    const StyledComponent = (props) => {
-        const { theme } = useTheme(); // <==== Pull theme from context
-        const classNameRef = useRef(generateClassName());
-        const className = classNameRef.current;
-        // Turn styleParam into a function if it's not already.
-        const getStyleFn = useMemo(() => {
-            if (typeof styleParam === "function") {
-                return styleParam;
-            }
-            else {
-                // If it's a style object, return a no-arg function that always returns the object.
-                return () => styleParam;
-            }
-        }, [styleParam]);
-        // Recompute the style object when props change.
-        const styleObj = useMemo(() => {
-            const finalProps = Object.assign(Object.assign({}, props), { $theme: theme });
-            return getStyleFn(finalProps);
-        }, [props, theme, getStyleFn]);
-        // Build final CSS from the style object + class name.
-        const finalCss = useMemo(() => {
-            return styleObjectToCss(className, styleObj);
-        }, [styleObj]);
-        // Inject or update the <style> in the DOM.
-        useEffect(() => {
-            const styleId = `style-${className}`;
-            let styleTag = document.getElementById(styleId);
-            if (!styleTag) {
-                styleTag = document.createElement("style");
-                styleTag.id = styleId;
-                document.head.appendChild(styleTag);
-            }
-            styleTag.textContent = finalCss;
-            // No cleanup needed since we're updating existing style tag
-        }, [finalCss, className]);
-        // Spread the rest props, apply the generated className
-        const { children } = props, restProps = __rest(props, ["children"]);
-        return React.createElement(tag, Object.assign(Object.assign({}, restProps), { className: [className, restProps.className].filter(Boolean).join(" ") }), children);
-    };
-    return StyledComponent;
-}
-function styleObjectToCss(className, styleObj) {
-    let baseStyles = "";
-    let nestedStyles = "";
-    for (const key of Object.keys(styleObj)) {
-        const val = styleObj[key];
-        if (key.startsWith(":") || key.startsWith("&")) {
-            const pseudoSelector = key.startsWith("&")
+// Cache to avoid duplicate <style> tags
+const styleCache = new Map();
+function styleToCss(className, styles) {
+    let base = "";
+    let nested = "";
+    for (const key in styles) {
+        const val = styles[key];
+        if (typeof val === "object") {
+            const selector = key.startsWith("&")
                 ? key.replace("&", `.${className}`)
                 : `.${className}${key}`;
-            if (typeof val === "object") {
-                nestedStyles += `${pseudoSelector} {${styleObjectToDeclarations(val)}}`;
-            }
+            nested += `${selector} { ${styleToDeclarations(val)} }`;
         }
         else {
-            baseStyles += `${camelCaseToDash(key)}: ${val};`;
+            base += `${camelCaseToDash(key)}: ${val};`;
         }
     }
-    return `.${className} {${baseStyles}} ${nestedStyles}`;
+    return `.${className} { ${base} } ${nested}`;
 }
-function styleObjectToDeclarations(obj) {
-    let declarations = "";
-    for (const key of Object.keys(obj)) {
-        const val = obj[key];
-        if (typeof val === "object") {
-            // If there are nested objects, handle them or skip
-            continue;
-        }
-        declarations += `${camelCaseToDash(key)}: ${val};`;
-    }
-    return declarations;
+function styleToDeclarations(obj) {
+    return Object.entries(obj)
+        .filter(([, v]) => typeof v !== "object")
+        .map(([k, v]) => `${camelCaseToDash(k)}: ${v};`)
+        .join(" ");
 }
 function camelCaseToDash(str) {
     return str.replace(/[A-Z]/g, (m) => "-" + m.toLowerCase());
 }
-function generateClassName() {
-    return "sc-" + Math.random().toString(36).substr(2, 7);
+function generateClassHash(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = (hash << 5) - hash + str.charCodeAt(i);
+        hash |= 0;
+    }
+    return `sc-${Math.abs(hash).toString(36)}`;
+}
+export function styled(tag, styleParam) {
+    return function StyledComponent(props) {
+        const { theme: $theme } = useTheme();
+        const fullProps = Object.assign(Object.assign({}, props), { $theme });
+        const styleObj = typeof styleParam === "function" ? styleParam(fullProps) : styleParam;
+        const styleKey = JSON.stringify(styleObj);
+        const className = useMemo(() => generateClassHash(styleKey), [styleKey]);
+        useEffect(() => {
+            if (styleCache.has(className))
+                return;
+            const css = styleToCss(className, styleObj);
+            const tag = document.createElement("style");
+            tag.textContent = css;
+            document.head.appendChild(tag);
+            styleCache.set(className, css);
+        }, [className, styleKey]);
+        const { children, className: incomingClass } = props, rest = __rest(props, ["children", "className"]);
+        return React.createElement(tag, Object.assign(Object.assign({}, rest), { className: [className, incomingClass].filter(Boolean).join(" ") }), children);
+    };
 }
