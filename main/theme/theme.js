@@ -1,4 +1,5 @@
 export const lightTheme = {
+    name: "light",
     primaryColor: "#818CF8", // Consistent across themes
     background: "#FAF9F6", // Soft off-white base
     background1: "#F5F5F5", // Light gray for subtle sections
@@ -16,6 +17,7 @@ export const lightTheme = {
     textAltColor: "#4D4D4D", // Medium gray for secondary text
 };
 export const darkTheme = {
+    name: "dark",
     primaryColor: "#818CF8",
     background: "#000000",
     background1: "#0a0a0a",

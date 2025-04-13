@@ -1,4 +1,5 @@
 export interface ThemeType {
+    name: "light" | "dark";
     primaryColor: string;
     background: string;
     background1: string;

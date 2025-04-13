@@ -1,4 +1,6 @@
 export interface ThemeType {
+  name: "light" | "dark";
+
   primaryColor: string; // Should always be #818CF8 in both light and dark themes
 
   background: string;
@@ -22,6 +24,7 @@ export interface ThemeType {
 }
 
 export const lightTheme: ThemeType = {
+  name: "light",
   primaryColor: "#818CF8", // Consistent across themes
 
   background: "#FAF9F6", // Soft off-white base
@@ -45,6 +48,7 @@ export const lightTheme: ThemeType = {
 };
 
 export const darkTheme: ThemeType = {
+  name: "dark",
   primaryColor: "#818CF8",
 
   background: "#000000",
