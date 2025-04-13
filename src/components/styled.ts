@@ -1,22 +1,23 @@
 import React, {
   useEffect,
   useMemo,
-  useRef,
   FC,
   ComponentPropsWithoutRef,
   JSX,
+  ComponentType,
+  ForwardRefExoticComponent,
+  PropsWithoutRef,
+  RefAttributes,
 } from "react";
 import { ThemeType } from "../theme/theme";
 import { useTheme } from "../theme/theme-provider";
+import { motion, MotionProps } from "framer-motion";
 
 type StyleObject = {
   [key: string]: string | number | StyleObject;
 };
 
-type StyledProps<T extends keyof JSX.IntrinsicElements, P> = Omit<
-  ComponentPropsWithoutRef<T>,
-  keyof P
-> &
+type StyledProps<T, P> = Omit<T, keyof P> &
   P & {
     $theme?: ThemeType;
     className?: string;
@@ -26,6 +27,17 @@ type StyledProps<T extends keyof JSX.IntrinsicElements, P> = Omit<
 type StyleParam<P> =
   | StyleObject
   | ((props: { $theme: ThemeType } & P) => StyleObject);
+
+// Type guard to check if component is a motion component
+function isMotionComponent(component: any): boolean {
+  return (
+    component &&
+    (component === motion.div ||
+      component === motion.span ||
+      // Add other motion components as needed
+      Object.values(motion).includes(component))
+  );
+}
 
 // Cache to avoid duplicate <style> tags
 const styleCache = new Map<string, string>();
@@ -70,12 +82,31 @@ function generateClassHash(str: string): string {
   return `sc-${Math.abs(hash).toString(36)}`;
 }
 
+// Function overloads for better TypeScript support
 export function styled<
   T extends keyof JSX.IntrinsicElements,
   P extends object = {}
->(tag: T, styleParam: StyleParam<P>): FC<StyledProps<T, P>> {
-  return function StyledComponent(props: StyledProps<T, P>) {
-    const { theme: $theme } = useTheme();
+>(
+  tag: T,
+  styleParam: StyleParam<P>
+): FC<StyledProps<ComponentPropsWithoutRef<T>, P>>;
+
+export function styled<
+  P extends object = {},
+  T extends ComponentType<any> = ComponentType<any>
+>(
+  component: T,
+  styleParam: StyleParam<P>
+): FC<StyledProps<ComponentPropsWithoutRef<T>, P>>;
+
+// Implementation
+export function styled<
+  T extends keyof JSX.IntrinsicElements | ComponentType<any>,
+  P extends object = {}
+>(tagOrComponent: T, styleParam: StyleParam<P>) {
+  return function StyledComponent(props: any) {
+    const { theme: contextTheme } = useTheme();
+    const $theme = props.$theme || contextTheme;
     const fullProps = { ...props, $theme } as { $theme: ThemeType } & P;
 
     const styleObj =
@@ -94,14 +125,57 @@ export function styled<
     }, [className, styleKey]);
 
     const { children, className: incomingClass, ...rest } = props;
+    const combinedClassName = [className, incomingClass]
+      .filter(Boolean)
+      .join(" ");
 
-    return React.createElement(
-      tag,
-      {
-        ...rest,
-        className: [className, incomingClass].filter(Boolean).join(" "),
-      },
-      children
-    );
+    // Handle both HTML elements and React components, including motion components
+    if (typeof tagOrComponent === "string") {
+      return React.createElement(
+        tagOrComponent,
+        {
+          ...rest,
+          className: combinedClassName,
+        },
+        children
+      );
+    } else if (isMotionComponent(tagOrComponent)) {
+      // For motion components, properly forward props
+      return React.createElement(
+        tagOrComponent as ComponentType,
+        {
+          ...rest,
+          className: combinedClassName,
+        },
+        children
+      );
+    } else {
+      // For other React components
+      return React.createElement(
+        tagOrComponent as ComponentType,
+        {
+          ...rest,
+          className: combinedClassName,
+        },
+        children
+      );
+    }
   };
+}
+
+// Example usage:
+// const MotionBox = styled(motion.div, {
+//   display: 'flex',
+//   background: 'blue'
+// });
+
+// Helper types to make using styled with motion components easier
+export type StyledMotionComponent<P = {}> = FC<StyledProps<MotionProps, P>>;
+
+// Helper function specifically for motion components
+export function styledMotion<
+  C extends keyof typeof motion,
+  P extends object = {}
+>(component: C, styleParam: StyleParam<P>): StyledMotionComponent<P> {
+  return styled(motion[component], styleParam) as StyledMotionComponent<P>;
 }

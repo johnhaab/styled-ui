@@ -11,6 +11,15 @@ var __rest = (this && this.__rest) || function (s, e) {
 };
 import React, { useEffect, useMemo, } from "react";
 import { useTheme } from "../theme/theme-provider";
+import { motion } from "framer-motion";
+// Type guard to check if component is a motion component
+function isMotionComponent(component) {
+    return (component &&
+        (component === motion.div ||
+            component === motion.span ||
+            // Add other motion components as needed
+            Object.values(motion).includes(component)));
+}
 // Cache to avoid duplicate <style> tags
 const styleCache = new Map();
 function styleToCss(className, styles) {
@@ -47,9 +56,11 @@ function generateClassHash(str) {
     }
     return `sc-${Math.abs(hash).toString(36)}`;
 }
-export function styled(tag, styleParam) {
+// Implementation
+export function styled(tagOrComponent, styleParam) {
     return function StyledComponent(props) {
-        const { theme: $theme } = useTheme();
+        const { theme: contextTheme } = useTheme();
+        const $theme = props.$theme || contextTheme;
         const fullProps = Object.assign(Object.assign({}, props), { $theme });
         const styleObj = typeof styleParam === "function" ? styleParam(fullProps) : styleParam;
         const styleKey = JSON.stringify(styleObj);
@@ -64,6 +75,24 @@ export function styled(tag, styleParam) {
             styleCache.set(className, css);
         }, [className, styleKey]);
         const { children, className: incomingClass } = props, rest = __rest(props, ["children", "className"]);
-        return React.createElement(tag, Object.assign(Object.assign({}, rest), { className: [className, incomingClass].filter(Boolean).join(" ") }), children);
+        const combinedClassName = [className, incomingClass]
+            .filter(Boolean)
+            .join(" ");
+        // Handle both HTML elements and React components, including motion components
+        if (typeof tagOrComponent === "string") {
+            return React.createElement(tagOrComponent, Object.assign(Object.assign({}, rest), { className: combinedClassName }), children);
+        }
+        else if (isMotionComponent(tagOrComponent)) {
+            // For motion components, properly forward props
+            return React.createElement(tagOrComponent, Object.assign(Object.assign({}, rest), { className: combinedClassName }), children);
+        }
+        else {
+            // For other React components
+            return React.createElement(tagOrComponent, Object.assign(Object.assign({}, rest), { className: combinedClassName }), children);
+        }
     };
+}
+// Helper function specifically for motion components
+export function styledMotion(component, styleParam) {
+    return styled(motion[component], styleParam);
 }
