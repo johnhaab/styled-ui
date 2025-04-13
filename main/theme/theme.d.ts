@@ -11,9 +11,9 @@ export interface ThemeType {
     midground3: string;
     midground4: string;
     foregroundColor: string;
+    borderColor: string;
     textColor: string;
     textAltColor: string;
-    borderColor: string;
 }
 export declare const lightTheme: ThemeType;
 export declare const darkTheme: ThemeType;
