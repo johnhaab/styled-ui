@@ -5,16 +5,15 @@ import React, {
   ComponentPropsWithoutRef,
   JSX,
   ComponentType,
-  ForwardRefExoticComponent,
-  PropsWithoutRef,
-  RefAttributes,
 } from "react";
 import { ThemeType } from "../theme/theme";
 import { useTheme } from "../theme/theme-provider";
 import { motion, MotionProps } from "framer-motion";
 
 type StyleObject = {
-  [key: string]: string | number | StyleObject;
+  [K in keyof React.CSSProperties]?: React.CSSProperties[K];
+} & {
+  [selector: string]: string | number | StyleObject;
 };
 
 type StyledProps<T, P> = Omit<T, keyof P> &
