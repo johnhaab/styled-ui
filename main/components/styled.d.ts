@@ -14,6 +14,23 @@ type StyledProps<T, P> = Omit<T, keyof P> & P & {
 type StyleParam<P> = StyleObject | ((props: {
     $theme: ThemeType;
 } & P) => StyleObject);
+export declare const media: {
+    mobile: (styles: StyleObject) => {
+        "@media (max-width: 768px)": StyleObject;
+    };
+    tablet: (styles: StyleObject) => {
+        "@media (min-width: 769px) and (max-width: 1024px)": StyleObject;
+    };
+    desktop: (styles: StyleObject) => {
+        "@media (min-width: 1025px)": StyleObject;
+    };
+    largeDesktop: (styles: StyleObject) => {
+        "@media (min-width: 1440px)": StyleObject;
+    };
+    custom: (query: string, styles: StyleObject) => {
+        [x: string]: StyleObject;
+    };
+};
 export declare function styled<T extends keyof JSX.IntrinsicElements, P extends object = {}>(tag: T, styleParam: StyleParam<P>): FC<StyledProps<ComponentPropsWithoutRef<T>, P>>;
 export declare function styled<P extends object = {}, T extends ComponentType<any> = ComponentType<any>>(component: T, styleParam: StyleParam<P>): FC<StyledProps<ComponentPropsWithoutRef<T>, P>>;
 export type StyledMotionComponent<P = {}> = FC<StyledProps<MotionProps, P>>;

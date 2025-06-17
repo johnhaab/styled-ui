@@ -28,10 +28,17 @@ function styleToCss(className, styles) {
     for (const key in styles) {
         const val = styles[key];
         if (typeof val === "object") {
-            const selector = key.startsWith("&")
-                ? key.replace("&", `.${className}`)
-                : `.${className}${key}`;
-            nested += `${selector} { ${styleToDeclarations(val)} }`;
+            if (key.startsWith("@media")) {
+                // Handle media queries
+                nested += `${key} { .${className} { ${styleToDeclarations(val)} } }`;
+            }
+            else {
+                // Handle pseudo-selectors and other nested selectors
+                const selector = key.startsWith("&")
+                    ? key.replace("&", `.${className}`)
+                    : `.${className}${key}`;
+                nested += `${selector} { ${styleToDeclarations(val)} }`;
+            }
         }
         else {
             base += `${camelCaseToDash(key)}: ${val};`;
@@ -56,6 +63,25 @@ function generateClassHash(str) {
     }
     return `sc-${Math.abs(hash).toString(36)}`;
 }
+// Media query helper functions for common breakpoints
+export const media = {
+    mobile: (styles) => ({
+        "@media (max-width: 768px)": styles,
+    }),
+    tablet: (styles) => ({
+        "@media (min-width: 769px) and (max-width: 1024px)": styles,
+    }),
+    desktop: (styles) => ({
+        "@media (min-width: 1025px)": styles,
+    }),
+    largeDesktop: (styles) => ({
+        "@media (min-width: 1440px)": styles,
+    }),
+    // Custom breakpoint helper
+    custom: (query, styles) => ({
+        [`@media ${query}`]: styles,
+    }),
+};
 // Implementation
 export function styled(tagOrComponent, styleParam) {
     return function StyledComponent(props) {

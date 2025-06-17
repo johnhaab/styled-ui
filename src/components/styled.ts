@@ -49,10 +49,16 @@ function styleToCss(className: string, styles: StyleObject): string {
     const val = styles[key];
 
     if (typeof val === "object") {
-      const selector = key.startsWith("&")
-        ? key.replace("&", `.${className}`)
-        : `.${className}${key}`;
-      nested += `${selector} { ${styleToDeclarations(val)} }`;
+      if (key.startsWith("@media")) {
+        // Handle media queries
+        nested += `${key} { .${className} { ${styleToDeclarations(val)} } }`;
+      } else {
+        // Handle pseudo-selectors and other nested selectors
+        const selector = key.startsWith("&")
+          ? key.replace("&", `.${className}`)
+          : `.${className}${key}`;
+        nested += `${selector} { ${styleToDeclarations(val)} }`;
+      }
     } else {
       base += `${camelCaseToDash(key)}: ${val};`;
     }
@@ -80,6 +86,26 @@ function generateClassHash(str: string): string {
   }
   return `sc-${Math.abs(hash).toString(36)}`;
 }
+
+// Media query helper functions for common breakpoints
+export const media = {
+  mobile: (styles: StyleObject) => ({
+    "@media (max-width: 768px)": styles,
+  }),
+  tablet: (styles: StyleObject) => ({
+    "@media (min-width: 769px) and (max-width: 1024px)": styles,
+  }),
+  desktop: (styles: StyleObject) => ({
+    "@media (min-width: 1025px)": styles,
+  }),
+  largeDesktop: (styles: StyleObject) => ({
+    "@media (min-width: 1440px)": styles,
+  }),
+  // Custom breakpoint helper
+  custom: (query: string, styles: StyleObject) => ({
+    [`@media ${query}`]: styles,
+  }),
+};
 
 // Function overloads for better TypeScript support
 export function styled<
@@ -161,12 +187,6 @@ export function styled<
     }
   };
 }
-
-// Example usage:
-// const MotionBox = styled(motion.div, {
-//   display: 'flex',
-//   background: 'blue'
-// });
 
 // Helper types to make using styled with motion components easier
 export type StyledMotionComponent<P = {}> = FC<StyledProps<MotionProps, P>>;
