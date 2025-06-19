@@ -27,18 +27,15 @@ type StyleParam<P> =
   | StyleObject
   | ((props: { $theme: ThemeType } & P) => StyleObject);
 
-// Type guard to check if component is a motion component
 function isMotionComponent(component: any): boolean {
   return (
     component &&
     (component === motion.div ||
       component === motion.span ||
-      // Add other motion components as needed
       Object.values(motion).includes(component))
   );
 }
 
-// Cache to avoid duplicate <style> tags
 const styleCache = new Map<string, string>();
 
 function styleToCss(className: string, styles: StyleObject): string {
@@ -47,13 +44,10 @@ function styleToCss(className: string, styles: StyleObject): string {
 
   for (const key in styles) {
     const val = styles[key];
-
     if (typeof val === "object") {
       if (key.startsWith("@media")) {
-        // Handle media queries
         nested += `${key} { .${className} { ${styleToDeclarations(val)} } }`;
       } else {
-        // Handle pseudo-selectors and other nested selectors
         const selector = key.startsWith("&")
           ? key.replace("&", `.${className}`)
           : `.${className}${key}`;
@@ -87,7 +81,6 @@ function generateClassHash(str: string): string {
   return `sc-${Math.abs(hash).toString(36)}`;
 }
 
-// Media query helper functions for common breakpoints
 export const media = {
   mobile: (styles: StyleObject) => ({
     "@media (max-width: 768px)": styles,
@@ -101,13 +94,11 @@ export const media = {
   largeDesktop: (styles: StyleObject) => ({
     "@media (min-width: 1440px)": styles,
   }),
-  // Custom breakpoint helper
   custom: (query: string, styles: StyleObject) => ({
     [`@media ${query}`]: styles,
   }),
 };
 
-// Function overloads for better TypeScript support
 export function styled<
   T extends keyof JSX.IntrinsicElements,
   P extends object = {}
@@ -124,15 +115,14 @@ export function styled<
   styleParam: StyleParam<P>
 ): FC<StyledProps<ComponentPropsWithoutRef<T>, P>>;
 
-// Implementation
 export function styled<
   T extends keyof JSX.IntrinsicElements | ComponentType<any>,
   P extends object = {}
 >(tagOrComponent: T, styleParam: StyleParam<P>) {
-  return function StyledComponent(props: any) {
+  return function StyledComponent(rawProps: any) {
     const { theme: contextTheme } = useTheme();
-    const $theme = props.$theme || contextTheme;
-    const fullProps = { ...props, $theme } as { $theme: ThemeType } & P;
+    const $theme = rawProps.$theme || contextTheme;
+    const fullProps = { ...rawProps, $theme } as { $theme: ThemeType } & P;
 
     const styleObj =
       typeof styleParam === "function" ? styleParam(fullProps) : styleParam;
@@ -149,49 +139,26 @@ export function styled<
       styleCache.set(className, css);
     }, [className, styleKey]);
 
-    const { children, className: incomingClass, ...rest } = props;
+    const { children, className: incomingClass, ...rest } = rawProps;
     const combinedClassName = [className, incomingClass]
       .filter(Boolean)
       .join(" ");
 
-    // Handle both HTML elements and React components, including motion components
-    if (typeof tagOrComponent === "string") {
-      return React.createElement(
-        tagOrComponent,
-        {
-          ...rest,
-          className: combinedClassName,
-        },
-        children
-      );
-    } else if (isMotionComponent(tagOrComponent)) {
-      // For motion components, properly forward props
-      return React.createElement(
-        tagOrComponent as ComponentType,
-        {
-          ...rest,
-          className: combinedClassName,
-        },
-        children
-      );
-    } else {
-      // For other React components
-      return React.createElement(
-        tagOrComponent as ComponentType,
-        {
-          ...rest,
-          className: combinedClassName,
-        },
-        children
-      );
+    // Strip out all custom `$` props before passing to DOM
+    const sanitizedProps: Record<string, any> = {};
+    for (const key in rest) {
+      if (!key.startsWith("$")) {
+        sanitizedProps[key] = rest[key];
+      }
     }
+    sanitizedProps.className = combinedClassName;
+
+    return React.createElement(tagOrComponent as any, sanitizedProps, children);
   };
 }
 
-// Helper types to make using styled with motion components easier
 export type StyledMotionComponent<P = {}> = FC<StyledProps<MotionProps, P>>;
 
-// Helper function specifically for motion components
 export function styledMotion<
   C extends keyof typeof motion,
   P extends object = {}
