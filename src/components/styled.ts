@@ -121,11 +121,18 @@ export function styled<
 >(tagOrComponent: T, styleParam: StyleParam<P>) {
   return function StyledComponent(rawProps: any) {
     const { theme: contextTheme } = useTheme();
-    const $theme = rawProps.$theme || contextTheme;
-    const fullProps = { ...rawProps, $theme } as { $theme: ThemeType } & P;
+
+    const {
+      $theme = contextTheme,
+      children,
+      className: incomingClass,
+      ...restProps
+    } = rawProps;
+
+    const styleProps = { $theme, ...rawProps } as { $theme: ThemeType } & P;
 
     const styleObj =
-      typeof styleParam === "function" ? styleParam(fullProps) : styleParam;
+      typeof styleParam === "function" ? styleParam(styleProps) : styleParam;
 
     const styleKey = JSON.stringify(styleObj);
     const className = useMemo(() => generateClassHash(styleKey), [styleKey]);
@@ -137,23 +144,29 @@ export function styled<
       tag.textContent = css;
       document.head.appendChild(tag);
       styleCache.set(className, css);
-    }, [className, styleKey]);
+    }, [className, styleObj]);
 
-    const { children, className: incomingClass, ...rest } = rawProps;
     const combinedClassName = [className, incomingClass]
       .filter(Boolean)
       .join(" ");
 
-    // Strip out all custom `$` props before passing to DOM
-    const sanitizedProps: Record<string, any> = {};
-    for (const key in rest) {
+    // Filter out only custom $ props, preserve all standard DOM props
+    const domProps: Record<string, any> = {};
+    for (const key in restProps) {
       if (!key.startsWith("$")) {
-        sanitizedProps[key] = rest[key];
+        domProps[key] = restProps[key];
       }
     }
-    sanitizedProps.className = combinedClassName;
 
-    return React.createElement(tagOrComponent as any, sanitizedProps, children);
+    // Ensure className is set
+    domProps.className = combinedClassName;
+
+    // REMOVE THIS SOON DONT FORGET HAHA: Debugging purpose
+    if (domProps.onClick) {
+      console.log("StyledComponent: onClick handler present", tagOrComponent);
+    }
+
+    return React.createElement(tagOrComponent as any, domProps, children);
   };
 }
 
